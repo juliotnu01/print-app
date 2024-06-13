@@ -76,12 +76,15 @@ async function procesarInformacion(data, condicion, filePath) {
     }
 
     try {
+        const startTime = Date.now(); // Iniciar el cronómetro antes de la petición
         const response = await axios.post(url, data, {
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${data.template_token}`
             }
         });
+        const endTime = Date.now(); // Detener el cronómetro después de la petición
+        console.log(`Tiempo de respuesta: ${endTime - startTime} ms`); // Mostrar el tiempo de respuesta en milisegundos
 
         const responseData = response.data;
 
