@@ -1,49 +1,114 @@
-// // server.js
-// const express = require('express');
-// import escpos from "escpos"
-// const escpos = require('escpos');
 import express from 'express'
 import escpos from "escpos"
 import USB from "escpos-usb"
 import cors from 'cors'
+import fs from 'fs'
+import path from 'path'
 escpos.USB = USB;
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Ruta del directorio a monitorear
+const directoryPath = '/Users/doctorgroup/Documents';
 
-app.post('/print', (req, res) => {
-    const content = req.body.content;
-
-    try {
-        // Enumerar dispositivos USB
-        const devices = escpos.USB.findPrinter();
-        if (devices.length === 0) {
-            throw new Error('No se encontraron impresoras USB compatibles.');
+// Función para procesar el archivo txt
+function processTxtFile(filePath, filename) {
+    fs.readFile(filePath, 'utf8', (err, data) => {
+        if (err) {
+            console.error(`Error leyendo el archivo ${filePath}:`, err);
+            return;
         }
 
-        // Usar el primer dispositivo encontrado (puedes ajustar esto según tus necesidades)
-        const device = new escpos.USB(devices[0].vendorId, devices[0].productId);
-        const printer = new escpos.Printer(device);
+        // Extrae las letras iniciales del nombre del archivo, incluyendo espacios antes de los números
+        const match = filename.match(/^[A-Za-z\s]+(?=\d)/);
+        if (match) {
+            var letrasIniciales = match[0].trim(); // Elimina espacios al final de las letras capturadas
+            console.log(`Letras iniciales del archivo: ${letrasIniciales}`);
+        }
+        procesarInformacion(JSON.parse(data), letrasIniciales, filePath)
+    });
+}
 
-        device.open(function (error) {
-            if (error) {
-                console.error("Error al abrir el dispositivo:", error);
-                return res.status(500).send("Error al abrir el dispositivo: " + error.message);
-            }
+async function procesarInformacion(data, condicion, filePath) {
+    const sentDirectory = path.join(path.dirname(filePath), 'Enviados');
+    const responseDirectory = path.join(path.dirname(filePath), 'Respuestas');
 
-            printer
-                .text(content)
-                .cut()
-                .close(function () {
-                    res.json({ message: 'Impresión completada' });
-                });
+    // Crear directorios si no existen
+    await fs.promises.mkdir(sentDirectory, { recursive: true });
+    await fs.promises.mkdir(responseDirectory, { recursive: true });
+
+    // Mover archivo a la carpeta 'Enviados'
+    const newFilePath = path.join(sentDirectory, path.basename(filePath));
+    await fs.promises.rename(filePath, newFilePath);
+
+    let url = '';
+    switch (condicion) {
+        case "FV":
+            url = 'http://aristafe.com:81/api/ubl2.1/invoice';
+            break;
+        case "FP":
+            url = 'http://aristafe.com:81/api/ubl2.1/eqdoc';
+            break;
+        case "NC":
+            url = 'http://aristafe.com:81/api/ubl2.1/credit-note';
+            break;
+        case "ND":
+            url = 'http://aristafe.com:81/api/ubl2.1/debit-note';
+            break;
+        case "DS":
+            url = 'http://aristafe.com:81/api/ubl2.1/support-document';
+            break;
+        case "DSA":
+            url = 'http://aristafe.com:81/api/ubl2.1/sd-credit-note';
+            break;
+        case "FE":
+            url = 'http://aristafe.com:81/api/ubl2.1/invoice-export';
+            break;
+        default:
+            console.log('Condición no reconocida, no se realiza ninguna acción');
+            return;
+    }
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${data.template_token}`   },
+            body: JSON.stringify(data) // Asegúrate de convertir el objeto 'data' a un string JSON
         });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const responseData = await response.json(); // Asegúrate de que la respuesta es válida y se puede convertir a JSON
+
+
+        // Guardar respuesta en la carpeta 'Respuestas'
+        const responseFilePath = path.join(responseDirectory, `${path.basename(filePath, '.json')}-response.json`);
+        await fs.promises.writeFile(responseFilePath, JSON.stringify(responseData, null, 2), 'utf8');
     } catch (error) {
-        console.error("Error:", error);
-        res.status(500).send("Error: " + error.message);
+        console.error('Error al procesar la información:', error);
+    }
+}
+
+// Monitorea el directorio
+fs.watch(directoryPath, (eventType, filename) => {
+    if (filename && path.extname(filename) === '.json') {
+        const filePath = path.join(directoryPath, filename);
+        if (eventType === 'rename') {
+            // Comprueba si el archivo fue agregado
+            fs.access(filePath, fs.constants.F_OK, (err) => {
+                if (!err) {
+                    console.log(`Archivo agregado: ${filename}`);
+                    processTxtFile(filePath, filename);
+                }
+            });
+        }
     }
 });
+
+console.log(`Monitoreando cambios en el directorio: ${directoryPath}`);
+
+
 
 const PORT = 3000;
 app.listen(PORT, () => {

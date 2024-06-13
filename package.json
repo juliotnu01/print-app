@@ -14,10 +14,15 @@
     "vite": "^5.2.0"
   },
   "dependencies": {
+    "chokidar": "^3.6.0",
     "cors": "^2.8.5",
     "escpos": "^3.0.0-alpha.6",
     "escpos-usb": "^3.0.0-alpha.4",
     "express": "^4.19.2",
-    "nodemon": "^3.1.2"
+    "fs": "^0.0.1-security",
+    "laravel-echo": "^1.16.1",
+    "nodemon": "^3.1.2",
+    "path": "^0.12.7",
+    "socket.io-client": "^4.7.5"
   }
 }
