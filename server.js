@@ -1,10 +1,10 @@
-import express from 'express'
-import escpos from "escpos"
-import USB from "escpos-usb"
-import cors from 'cors'
-import fs from 'fs'
-import path from 'path'
-import axios from 'axios'
+import express from 'express';
+import escpos from 'escpos';
+import USB from 'escpos-usb';
+import cors from 'cors';
+import fs from 'fs';
+import path from 'path';
+import axios from 'axios';
 
 escpos.USB = USB;
 const app = express();
@@ -13,8 +13,12 @@ app.use(express.json());
 
 // Ruta del directorio a monitorear
 const directoryPath = '/Users/doctorgroup/Documents';
-const FilePathEnviados = "/Users/doctorgroup/Documents"
-const FilePathRespuesta = "/Users/doctorgroup/Documents"
+const FilePathEnviados = "/Users/doctorgroup/Documents/Enviados";
+const FilePathRespuesta = "/Users/doctorgroup/Documents/Respuestas";
+
+// Crear directorios si no existen
+fs.promises.mkdir(FilePathEnviados, { recursive: true }).catch(console.error);
+fs.promises.mkdir(FilePathRespuesta, { recursive: true }).catch(console.error);
 
 // Función para procesar el archivo txt
 function processTxtFile(filePath, filename) {
@@ -27,23 +31,20 @@ function processTxtFile(filePath, filename) {
         // Extrae las letras iniciales del nombre del archivo, incluyendo espacios antes de los números
         const match = filename.match(/^[A-Za-z\s]+(?=\d)/);
         if (match) {
-            var letrasIniciales = match[0].trim(); // Elimina espacios al final de las letras capturadas
+            const letrasIniciales = match[0].trim(); // Elimina espacios al final de las letras capturadas
             console.log(`Letras iniciales del archivo: ${letrasIniciales}`);
+            procesarInformacion(JSON.parse(data), letrasIniciales, filePath);
         }
-        procesarInformacion(JSON.parse(data), letrasIniciales, filePath)
     });
 }
 
 async function procesarInformacion(data, condicion, filePath) {
-    const sentDirectory = path.join(path.dirname(FilePathEnviados), 'Enviados');
-    const responseDirectory = path.join(path.dirname(FilePathRespuesta), 'Respuestas');
-
     // Crear directorios si no existen
-    await fs.promises.mkdir(sentDirectory, { recursive: true });
-    await fs.promises.mkdir(responseDirectory, { recursive: true });
+    await fs.promises.mkdir(FilePathEnviados, { recursive: true });
+    await fs.promises.mkdir(FilePathRespuesta, { recursive: true });
 
     // Mover archivo a la carpeta 'Enviados'
-    const newFilePath = path.join(sentDirectory, path.basename(filePath));
+    const newFilePath = path.join(FilePathEnviados, path.basename(filePath));
     await fs.promises.rename(filePath, newFilePath);
 
     let url = '';
@@ -75,22 +76,17 @@ async function procesarInformacion(data, condicion, filePath) {
     }
 
     try {
-        let responseData;
-        try {
-            const response = await axios.post(url, data, {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${data.template_token}`
-                }
-            });
-            responseData = response.data;
-        } catch (error) {
-            throw new Error(`HTTP error! status: ${error.response.status}`);
-        }
+        const response = await axios.post(url, data, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${data.template_token}`
+            }
+        });
 
+        const responseData = response.data;
 
         // Guardar respuesta en la carpeta 'Respuestas'
-        const responseFilePath = path.join(responseDirectory, `${path.basename(filePath, '.json')}-response.json`);
+        const responseFilePath = path.join(FilePathRespuesta, `${path.basename(filePath, '.json')}-response.json`);
         await fs.promises.writeFile(responseFilePath, JSON.stringify(responseData, null, 2), 'utf8');
     } catch (error) {
         console.error('Error al procesar la información:', error);
@@ -114,8 +110,6 @@ fs.watch(directoryPath, (eventType, filename) => {
 });
 
 console.log(`Monitoreando cambios en el directorio: ${directoryPath}`);
-
-
 
 const PORT = 3000;
 app.listen(PORT, () => {
