@@ -32,7 +32,6 @@ function processTxtFile(filePath, filename) {
         const match = filename.match(/^[A-Za-z\s]+(?=\d)/);
         if (match) {
             const letrasIniciales = match[0].trim(); // Elimina espacios al final de las letras capturadas
-            console.log(`Letras iniciales del archivo: ${letrasIniciales}`);
             procesarInformacion(JSON.parse(data), letrasIniciales, filePath);
         }
     });
@@ -46,6 +45,7 @@ async function procesarInformacion(data, condicion, filePath) {
     // Mover archivo a la carpeta 'Enviados'
     const newFilePath = path.join(FilePathEnviados, path.basename(filePath));
     await fs.promises.rename(filePath, newFilePath);
+
 
     let url = '';
     switch (condicion) {
@@ -76,21 +76,33 @@ async function procesarInformacion(data, condicion, filePath) {
     }
 
     try {
-        const startTime = Date.now(); // Iniciar el cronómetro antes de la petición
-        const response = await axios.post(url, data, {
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${data.template_token}`
-            }
-        });
-        const endTime = Date.now(); // Detener el cronómetro después de la petición
-        console.log(`Tiempo de respuesta: ${endTime - startTime} ms`); // Mostrar el tiempo de respuesta en milisegundos
 
-        const responseData = response.data;
+        const response = await axios.post(url, data, { headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${data.template_token}` } });
 
         // Guardar respuesta en la carpeta 'Respuestas'
-        const responseFilePath = path.join(FilePathRespuesta, `${path.basename(filePath, '.json')}-response.json`);
-        await fs.promises.writeFile(responseFilePath, JSON.stringify(responseData, null, 2), 'utf8');
+        const responseFilePath = path.join(FilePathRespuesta, `${path.basename(`${filePath}.txt`, '.txt')}-RESP.json`);
+        await fs.promises.writeFile(responseFilePath, JSON.stringify(response.data, null, 2), 'utf8');
+
+        // Descargar y guardar archivos adjuntos especificados en la respuesta
+        const filesToDownload = [
+            response.data.urlinvoicexml,
+            response.data.urlinvoicepdf,
+            response.data.urlinvoiceattached
+        ];
+
+        for (const fileUrl of filesToDownload) {
+            if (fileUrl) {
+                const fileName = path.basename(fileUrl);
+                const fileSavePath = path.join(FilePathRespuesta, fileName);
+                const fileData = await axios.get(`http://aristafe.com:81/api/download/${data.establishment_nit}/${fileUrl}`, { responseType: 'stream' });
+                const writer = fs.createWriteStream(fileSavePath);
+                fileData.data.pipe(writer);
+                await new Promise((resolve, reject) => {
+                    writer.on('finish', resolve);
+                    writer.on('error', reject);
+                });
+            }
+        }
     } catch (error) {
         console.error('Error al procesar la información:', error);
     }
@@ -98,7 +110,7 @@ async function procesarInformacion(data, condicion, filePath) {
 
 // Monitorea el directorio
 fs.watch(directoryPath, (eventType, filename) => {
-    if (filename && path.extname(filename) === '.json') {
+    if (filename && path.extname(filename) === '.txt') {
         const filePath = path.join(directoryPath, filename);
         if (eventType === 'rename') {
             // Comprueba si el archivo fue agregado
