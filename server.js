@@ -11,6 +11,8 @@ app.use(express.json());
 
 // Ruta del directorio a monitorear
 const directoryPath = '/Users/doctorgroup/Documents';
+const FilePathEnviados = ""
+const FilePathRespuesta = ""
 
 // Función para procesar el archivo txt
 function processTxtFile(filePath, filename) {
@@ -31,8 +33,8 @@ function processTxtFile(filePath, filename) {
 }
 
 async function procesarInformacion(data, condicion, filePath) {
-    const sentDirectory = path.join(path.dirname(filePath), 'Enviados');
-    const responseDirectory = path.join(path.dirname(filePath), 'Respuestas');
+    const sentDirectory = path.join(path.dirname(FilePathEnviados), 'Enviados');
+    const responseDirectory = path.join(path.dirname(FilePathRespuesta), 'Respuestas');
 
     // Crear directorios si no existen
     await fs.promises.mkdir(sentDirectory, { recursive: true });
