@@ -4,6 +4,8 @@ import USB from "escpos-usb"
 import cors from 'cors'
 import fs from 'fs'
 import path from 'path'
+import axios from 'axios'
+
 escpos.USB = USB;
 const app = express();
 app.use(cors());
@@ -11,8 +13,8 @@ app.use(express.json());
 
 // Ruta del directorio a monitorear
 const directoryPath = '/Users/doctorgroup/Documents';
-const FilePathEnviados = ""
-const FilePathRespuesta = ""
+const FilePathEnviados = "/Users/doctorgroup/Documents"
+const FilePathRespuesta = "/Users/doctorgroup/Documents"
 
 // Función para procesar el archivo txt
 function processTxtFile(filePath, filename) {
@@ -73,15 +75,18 @@ async function procesarInformacion(data, condicion, filePath) {
     }
 
     try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${data.template_token}`   },
-            body: JSON.stringify(data) // Asegúrate de convertir el objeto 'data' a un string JSON
-        });
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+        let responseData;
+        try {
+            const response = await axios.post(url, data, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${data.template_token}`
+                }
+            });
+            responseData = response.data;
+        } catch (error) {
+            throw new Error(`HTTP error! status: ${error.response.status}`);
         }
-        const responseData = await response.json(); // Asegúrate de que la respuesta es válida y se puede convertir a JSON
 
 
         // Guardar respuesta en la carpeta 'Respuestas'
