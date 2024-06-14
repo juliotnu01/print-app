@@ -6,23 +6,26 @@ import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
 
+import { execFile } from 'child_process';
+
 escpos.USB = USB;
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 // Ruta del directorio a monitorear
-const directoryPath = '/Users/doctorgroup/Documents';
-const FilePathEnviados = "/Users/doctorgroup/Documents/Enviados";
-const FilePathRespuesta = "/Users/doctorgroup/Documents/Respuestas";
+const directoryPath = 'd:/usr/porenviar';
+const FilePathEnviados = "d:/usr/Enviados";
+const FilePathEnviadosArgumento = "d:\\usr\\Enviados\\";
+const FilePathRespuesta = "d:/usr/Respuestas";
 
 // Crear directorios si no existen
 fs.promises.mkdir(FilePathEnviados, { recursive: true }).catch(console.error);
 fs.promises.mkdir(FilePathRespuesta, { recursive: true }).catch(console.error);
 
 // Función para procesar el archivo txt
-function processTxtFile(filePath, filename) {
-    fs.readFile(filePath, 'utf8', (err, data) => {
+function  processTxtFile(filePath, filename) {
+    fs.readFile(filePath, 'utf8', async (err, data) => {
         if (err) {
             console.error(`Error leyendo el archivo ${filePath}:`, err);
             return;
@@ -32,7 +35,9 @@ function processTxtFile(filePath, filename) {
         const match = filename.match(/^[A-Za-z\s]+(?=\d)/);
         if (match) {
             const letrasIniciales = match[0].trim(); // Elimina espacios al final de las letras capturadas
-            procesarInformacion(JSON.parse(data), letrasIniciales, filePath);
+            await procesarInformacion(JSON.parse(data), letrasIniciales, filePath);
+            // ejecuta el print.php impresion de la factura
+            axios(`http://localhost/print_pos/print.php?path=${FilePathEnviadosArgumento}${filename}`)
         }
     });
 }
@@ -82,6 +87,8 @@ async function procesarInformacion(data, condicion, filePath) {
         // Guardar respuesta en la carpeta 'Respuestas'
         const responseFilePath = path.join(FilePathRespuesta, `${path.basename(`${filePath}.txt`, '.txt')}-RESP.json`);
         await fs.promises.writeFile(responseFilePath, JSON.stringify(response.data, null, 2), 'utf8');
+
+        // aqui va el comado php para imprimir la factura
 
         // Descargar y guardar archivos adjuntos especificados en la respuesta
         const filesToDownload = [
