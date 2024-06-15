@@ -37,17 +37,8 @@ function processTxtFile(filePath, filename) {
         const match = filename.match(/^[A-Za-z\s]+(?=\d)/);
         if (match) {
             const letrasIniciales = match[0].trim(); // Elimina espacios al final de las letras capturadas
-            // await procesarInformacion(JSON.parse(data), letrasIniciales, filePath);
-            const notificationOptions = {
-                title: 'Notificación de prueba',
-                message: '¡Hola! Esto es una notificación del sistema.',
-                sound: true, // Sonido de notificación
-            };
+            await procesarInformacion(JSON.parse(data), letrasIniciales, filePath);
 
-            // Enviar la notificación
-            notifier.notify(notificationOptions, function (error, response) {
-                console.log(response);
-            });
             // ejecuta el print.php impresion de la factura
             // axios(`http://localhost/print_pos/print.php?path=${FilePathEnviadosArgumento}${filename}`)
         }
@@ -100,7 +91,20 @@ async function procesarInformacion(data, condicion, filePath) {
         const responseFilePath = path.join(FilePathRespuesta, `${path.basename(`${filePath}.txt`, '.txt')}-RESP.json`);
         await fs.promises.writeFile(responseFilePath, JSON.stringify(response.data, null, 2), 'utf8');
 
+        const { message } = response.data
+        const { ResponseDian } = response.data
+        const { Body } = ResponseDian.Envelope
+        const { SendBillSyncResult } = Body.SendBillSyncResponse
+        const { IsValid } = SendBillSyncResult
+        const { string } = SendBillSyncResult.ErrorMessage
+        const { StatusDescription } = SendBillSyncResult
 
+
+
+
+        
+
+        notificación(StatusDescription, string )
 
         // Descargar y guardar archivos adjuntos especificados en la respuesta
         const filesToDownload = [
@@ -124,6 +128,24 @@ async function procesarInformacion(data, condicion, filePath) {
         }
     } catch (error) {
         console.error('Error al procesar la información:', error);
+    }
+}
+
+function notificación(titulo, mensaje) {
+
+    for (let index = 0; index < mensaje.length; index++) {
+        const element = mensaje[index];
+        
+        const notificationOptions = {
+            title: titulo,
+            message: element,
+            sound: true, // Sonido de notificación
+            wait: true,
+            timeout: 99,
+        };
+    
+        // Enviar la notificación
+        notifier.notify(notificationOptions);
     }
 }
 
